@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv='Content-type' content='text/html; charset=utf-8'>
+    <title>Hearts</title>
+    <link rel="stylesheet" href="../shared/css/base.css" />
+    <style type="text/css">
+      .reddeck {
+        color: #ff8080;
+        display: block;
+      }
+
+      .blackdeck {
+        color: #000000;
+        display: block;
+      }
+
+      .column-left { 
+        float: left; 
+        width: 33%; 
+      }
+      .column-right { 
+        float: right; 
+        width: 33%; 
+      }
+      .column-center { 
+        display: inline-block; 
+        width: 33%;
+      }
+
+      .cardLink {
+        text-decoration: underline;
+        color: inherit;
+      }
+
+      .illegal {
+        text-decoration: line-through;
+      }
+
+      h4 {
+        margin: 10px;
+        background-color:lightblue; 
+      }
+    </style>
+  </head>
+  <body>
+    <h1>The Game of Hearts</h1>
+    
+    <div id="container" />
+    
+    <script src="../../build/react.js"></script>
+    <script src="../../build/JSXTransformer.js"></script>
+    <script src="underscore-min.js"></script>
+    <script type="text/javascript">
+      
+      var numbers = [
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "T",
+        "J",
+        "Q",
+        "K",
+        "A"
+      ];
+
+      var cardScores = {
+        0 : 1,
+        1 : 1,
+        2 : 1,
+        3 : 1,
+        4 : 1,
+        5 : 1,
+        6 : 1,
+        7 : 1,
+        8 : 1,
+        9 : 1,
+        10 : 1,
+        11 : 1,
+        12 : 1,
+        23 : 10,
+        48 : -10
+      }
+
+      /**
+       * This is game state that should probably be moved around.
+       */
+      var shuffledDeck = _.shuffle(_.range(52));
+      var hands = [
+        shuffledDeck.slice(0, 13),
+        shuffledDeck.slice(13, 26),
+        shuffledDeck.slice(26, 39),
+        shuffledDeck.slice(39, 52)
+      ];
+      var playedCards = [
+        [],
+        [],
+        [],
+        []
+      ];
+      var startingPlayer = 0;
+      var heartPlayed = false;
+      var currentSuit = -1;
+      var turnCards = [];
+      var scores = [0, 0, 0, 0];
+      var gameRound = 1;
+
+      function resetTurn(nextPlayer) {
+        startingPlayer = nextPlayer;
+        currentSuit = -1;
+        turnCards = [];
+      }
+
+      function getCardSuit(card) {
+        return Math.floor(card / 13);
+      }
+
+      function playCard(player, card) {
+        turnCards.push(card);
+        if (card.suit === 0) { // HEARTS
+          heartPlayed = true;
+        }
+        hands[player] = _.without(hands[player], card);
+        playedCards[player].push(card);
+      }
+
+      function getTurnWinner() {
+        return turn;
+      }
+
+      function getTurnScore() {
+        _.reduce(
+          _.map(
+            turnCards, 
+            function(x) {
+              if (x in cardScores) {
+                return cardScores[x];
+              } else {
+                return 0;
+              }
+            }
+          ),
+          function(memo, num) {
+            return memo + num;
+          },
+          0
+        );
+      }
+
+
+      function isLegalCard(card, hand) {
+        if (!_.contains(hand, card)) {
+          return false;
+        }
+        suit = getCardSuit(card);
+        
+        if (currentSuit === -1) {
+          if (suit === 0) { // HEARTS 
+            return heartPlayed;
+          } else {
+            return true;
+          }
+        }
+
+        if (currentSuit === suit) {
+          return true;
+        }
+
+        return _.every(
+          hand,
+          function(x) {
+            return currentSuit !== getCardSuit(x);
+          }
+        );
+      }
+
+      function playRandomCard(hand) {
+        var legal = _.filter(hand, isLegalCard);
+        var r = random(0, legal.length - 1);
+        return r;
+      }
+
+    </script>
+    <script type="text/jsx">
+      
+      /**
+       * @jsx React.DOM
+       */
+
+      var Hand = React.createClass({
+        render: function() {
+          var handParts = _.groupBy(
+            this.props.cards,
+            getCardSuit
+          );
+          
+          props = this.props;
+          for (var handType in handParts) {
+            handParts[handType].sort(
+              function(a, b) { return a - b; }
+            );
+            handParts[handType] = _.map(
+              handParts[handType],
+              function (x) {
+                if (props.showLegal) {
+                  if (isLegalCard(x, props.cards)) {
+                    return (
+                      <a href="#" className="cardLink" key={x}>
+                        {numbers[x % 13]}
+                      </a>
+                    ); 
+                  } else {
+                    return (
+                      <span key={x} className="illegal">
+                        {numbers[x % 13]}
+                      </span>
+                    ); 
+                  }
+                } else {
+                  return (
+                    <span key={x}>
+                      {numbers[x % 13]}
+                    </span>
+                  );
+                }
+              }
+            );
+          }
+
+          return (
+            <div>
+              <span className="reddeck">
+                &hearts; 
+                {handParts[0]}
+              </span>
+              <span className="blackdeck">
+                &spades;
+                {handParts[1]}
+              </span>
+              <span className="blackdeck">
+                &clubs;
+                {handParts[2]}
+              </span>
+              <span className="reddeck">
+                &diams;
+                {handParts[3]}
+              </span>
+            </div>
+          );
+        }
+      });
+
+      var GameBoard = React.createClass({
+        render: function() {
+          return (
+            <div>
+              <div className="column-left">
+                <h4> Your hand: </h4>
+                <Hand cards={this.props.playerHand} showLegal={true} />
+              </div>
+              <div className="column-center">
+                <h4> Current turn {gameRound}/13: </h4>
+                <Hand cards={turnCards} showLegal={false} />
+              </div>
+              <div className="column-right">
+                <h4> Played cards: </h4>
+                <h5> Player 1: </h5>
+                <Hand cards={playedCards[0]} showLegal={false} />
+                <h5> Player 2: </h5>
+                <Hand cards={playedCards[1]} showLegal={false} />
+                <h5> Player 3: </h5>
+                <Hand cards={playedCards[2]} showLegal={false} />
+                <h5> Player 4: </h5>
+                <Hand cards={playedCards[3]} showLegal={false} />
+              </div>
+            </div>
+          );
+        }
+      });
+
+      React.renderComponent(
+        <GameBoard playerHand={hands[0]} />,
+        document.getElementById('container')
+      );
+    </script>
+  </body>
+</html>
