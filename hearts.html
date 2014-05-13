@@ -41,6 +41,22 @@
         margin: 10px;
         background-color:lightblue; 
       }
+
+      .nextRound {
+        display: block;
+        background: green;
+        text-align: center;
+        color: white;
+        margin: 10px;
+      }
+        
+      .debug {
+        display: none;
+      }
+
+      .nextRound:hover {
+        text-decoration: none;
+      }
     </style>
   </head>
   <body>
@@ -87,102 +103,8 @@
         48 : -10
       }
 
-      /**
-       * This is game state that should probably be moved around.
-       */
-      var shuffledDeck = _.shuffle(_.range(52));
-      var hands = [
-        shuffledDeck.slice(0, 13),
-        shuffledDeck.slice(13, 26),
-        shuffledDeck.slice(26, 39),
-        shuffledDeck.slice(39, 52)
-      ];
-      var playedCards = [
-        [],
-        [],
-        [],
-        []
-      ];
-      var startingPlayer = 0;
-      var heartPlayed = false;
-      var currentSuit = -1;
-      var turnCards = [];
-      var scores = [0, 0, 0, 0];
-      var gameRound = 1;
-
-      function resetTurn(nextPlayer) {
-        startingPlayer = nextPlayer;
-        currentSuit = -1;
-        turnCards = [];
-      }
-
       function getCardSuit(card) {
         return Math.floor(card / 13);
-      }
-
-      function playCard(player, card) {
-        turnCards.push(card);
-        if (card.suit === 0) { // HEARTS
-          heartPlayed = true;
-        }
-        hands[player] = _.without(hands[player], card);
-        playedCards[player].push(card);
-      }
-
-      function getTurnWinner() {
-        return turn;
-      }
-
-      function getTurnScore() {
-        _.reduce(
-          _.map(
-            turnCards, 
-            function(x) {
-              if (x in cardScores) {
-                return cardScores[x];
-              } else {
-                return 0;
-              }
-            }
-          ),
-          function(memo, num) {
-            return memo + num;
-          },
-          0
-        );
-      }
-
-
-      function isLegalCard(card, hand) {
-        if (!_.contains(hand, card)) {
-          return false;
-        }
-        suit = getCardSuit(card);
-        
-        if (currentSuit === -1) {
-          if (suit === 0) { // HEARTS 
-            return heartPlayed;
-          } else {
-            return true;
-          }
-        }
-
-        if (currentSuit === suit) {
-          return true;
-        }
-
-        return _.every(
-          hand,
-          function(x) {
-            return currentSuit !== getCardSuit(x);
-          }
-        );
-      }
-
-      function playRandomCard(hand) {
-        var legal = _.filter(hand, isLegalCard);
-        var r = random(0, legal.length - 1);
-        return r;
       }
 
     </script>
@@ -191,6 +113,24 @@
       /**
        * @jsx React.DOM
        */
+
+      var SelectableCard = React.createClass({
+        handleClick: function(event) {
+          this.props.handlePlayCard(this.props.card);
+          return false;
+        },
+        render: function() {
+          return (
+            <a 
+              href="#" 
+              onClick={this.handleClick}
+              className="cardLink"
+            >
+              {numbers[this.props.card % 13]}
+            </a>
+          );
+        }
+      });
 
       var Hand = React.createClass({
         render: function() {
@@ -207,23 +147,27 @@
             handParts[handType] = _.map(
               handParts[handType],
               function (x) {
+                var key = _.uniqueId('card');
                 if (props.showLegal) {
-                  if (isLegalCard(x, props.cards)) {
+                  if (props.handleIsLegalCard(x, props.cards)) {
                     return (
-                      <a href="#" className="cardLink" key={x}>
-                        {numbers[x % 13]}
-                      </a>
+                      <SelectableCard
+                        card={x}
+                        key={key}
+                        player={props.player}
+                        handlePlayCard={props.handlePlayCard}
+                      />
                     ); 
                   } else {
                     return (
-                      <span key={x} className="illegal">
+                      <span key={key} className="illegal">
                         {numbers[x % 13]}
                       </span>
                     ); 
                   }
                 } else {
                   return (
-                    <span key={x}>
+                    <span key={key}>
                       {numbers[x % 13]}
                     </span>
                   );
@@ -255,28 +199,219 @@
         }
       });
 
+      var TurnHeader = React.createClass({
+        render: function() {
+          return <h4> Current turn {this.props.turn}/13:</h4>;
+        }
+      });
+
+      var WaitButton = React.createClass({
+        render: function() {
+          if (this.props.visible) {
+            return (
+              <a href="#" className="nextRound" onClick={this.props.onConfirm}>
+                Go to the next round
+              </a>
+            );
+          } else {
+            return <p/>;
+          }
+        }
+      });
+
       var GameBoard = React.createClass({
+        getInitialState: function() {
+          var shuffledDeck = _.shuffle(_.range(52));
+          return {
+            hands : [
+              shuffledDeck.slice(0, 13),
+              shuffledDeck.slice(13, 26),
+              shuffledDeck.slice(26, 39),
+              shuffledDeck.slice(39, 52)
+            ],
+            playedCards : [
+              [],
+              [],
+              [],
+              []
+            ],
+            turnCards : [],
+            heartPlayed : false,
+            turn : 1,
+            currentSuit : -1,
+            scores : [0, 0, 0, 0],
+            startingPlayer: 0,
+            waiting : false
+          };
+        },
+        playCard: function(player, card) {
+          var newState = this.state;
+          newState.turnCards.push(card);
+          if (getCardSuit(card) === 0) { // HEARTS
+            newState.heartPlayed = true;
+          }
+          if (this.state.currentSuit === -1) {
+            newState.currentSuit = getCardSuit(card);
+          }
+          newState.hands[player] = _.without(newState.hands[player], card);
+          newState.playedCards[player].push(card);
+          this.setState(newState);
+        },
+        playRandomCard: function(hand) {
+          var isLegalCard = _.bind(this.isLegalCard, this);
+          var legal = _.filter(hand, function(x) {
+            return isLegalCard(x, hand);
+          });
+          var r = _.random(0, legal.length - 1);
+          return legal[r];
+        },
+        getTurnWinner: function() {
+          var turnCards = this.state.turnCards;
+          var currentSuit = this.state.currentSuit;
+          console.log(turnCards);
+          console.log(currentSuit);
+          var rescored = _.map(
+            turnCards,
+            function(x) {
+              if (getCardSuit(x) === currentSuit) {
+                return x;
+              } else {
+                return -1;
+              }
+            }
+          );
+          
+          var offset = _.indexOf(rescored, _.max(rescored));
+          return (this.state.startingPlayer + offset) % 4;
+        },
+        getTurnScore: function() {
+          turnCards = this.state.turnCards;
+          return _.reduce(
+            _.map(
+              turnCards, 
+              function(x) {
+                if (x in cardScores) {
+                  return cardScores[x];
+                } else {
+                  return 0;
+                }
+              }
+            ),
+            function(memo, num) {
+              return memo + num;
+            },
+            0
+          );
+        },
+        postUser: function() {
+          var end = this.state.startingPlayer;
+          if (this.state.startingPlayer === 0) {
+            end = 4;
+          }
+          for (var i = 1; i < end; ++i) {
+            this.playCard(i, this.playRandomCard(this.state.hands[i]));
+          }
+        },
+        preUser: function(card) {
+          if (this.state.startingPlayer === 0) {
+            return;
+          }
+          for (var i = this.state.startingPlayer; i < 4; ++i) {
+            this.playCard(i, this.playRandomCard(this.state.hands[i]));  
+          }
+        },
+        handleConfirm: function(event) {
+          this.setState({
+            waiting: false,
+            currentSuit : -1,
+            turnCards : []
+          }, _.bind(this.preUser, this));
+          return false;
+        },
+        userTurn: function(card) {
+          this.playCard(0, card);
+          this.postUser();
+          var winner = this.getTurnWinner();
+          var score = this.getTurnScore();
+          var scores = this.state.scores;
+          console.log("Player " + winner + " won " + score);
+          scores[winner] += score;
+          this.setState({
+            scores: scores,
+            turn: this.state.turn + 1,
+            startingPlayer: winner,
+            waiting: true
+          });
+        },
+        isLegalCard: function(card, hand) {
+          if (!_.contains(hand, card)) {
+            return false;
+          }
+          suit = getCardSuit(card);
+          currentSuit = this.state.currentSuit;
+          
+          if (currentSuit === -1) {
+            if (suit === 0) { // HEARTS 
+              return this.state.heartPlayed;
+            } else {
+              return true;
+            }
+          }
+
+          if (currentSuit === suit) {
+            return true;
+          }
+
+          return _.every(
+            hand,
+            function(x) {
+              return currentSuit !== getCardSuit(x);
+            }
+          );
+        },
         render: function() {
           return (
             <div>
               <div className="column-left">
                 <h4> Your hand: </h4>
-                <Hand cards={this.props.playerHand} showLegal={true} />
+                <Hand 
+                  cards={this.state.hands[0]} 
+                  showLegal={!this.state.waiting} 
+                  handleIsLegalCard={_.bind(this.isLegalCard, this)}
+                  handlePlayCard={_.bind(this.userTurn, this)}
+                />
+                <h4> Scores: </h4>
+                <div>
+                  <p>Player 1: {this.state.scores[0]}</p>
+                  <p>Player 2: {this.state.scores[1]}</p>
+                  <p>Player 3: {this.state.scores[2]}</p>
+                  <p>Player 4: {this.state.scores[3]}</p>
+                </div>
               </div>
               <div className="column-center">
-                <h4> Current turn {gameRound}/13: </h4>
-                <Hand cards={turnCards} showLegal={false} />
+                <TurnHeader turn={this.state.turn}/>
+                <Hand cards={this.state.turnCards} showLegal={false} />
+                <WaitButton 
+                  visible={this.state.waiting}
+                  onConfirm={_.bind(this.handleConfirm, this)}
+                />
+                <div className="debug">
+                  <h4> Debug Area </h4>
+                  <Hand cards={this.state.hands[1]} showLegal={false} />
+                  <Hand cards={this.state.hands[2]} showLegal={false} />
+                  <Hand cards={this.state.hands[3]} showLegal={false} />
+                </div>
               </div>
               <div className="column-right">
                 <h4> Played cards: </h4>
                 <h5> Player 1: </h5>
-                <Hand cards={playedCards[0]} showLegal={false} />
+                <Hand cards={this.state.playedCards[0]} showLegal={false} />
                 <h5> Player 2: </h5>
-                <Hand cards={playedCards[1]} showLegal={false} />
+                <Hand cards={this.state.playedCards[1]} showLegal={false} />
                 <h5> Player 3: </h5>
-                <Hand cards={playedCards[2]} showLegal={false} />
+                <Hand cards={this.state.playedCards[2]} showLegal={false} />
                 <h5> Player 4: </h5>
-                <Hand cards={playedCards[3]} showLegal={false} />
+                <Hand cards={this.state.playedCards[3]} showLegal={false} />
               </div>
             </div>
           );
@@ -284,7 +419,7 @@
       });
 
       React.renderComponent(
-        <GameBoard playerHand={hands[0]} />,
+        <GameBoard />,
         document.getElementById('container')
       );
     </script>
