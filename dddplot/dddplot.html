@@ -1,0 +1,73 @@
+<html>
+	<head>
+    <title>
+      dddplot demo
+    </title>
+		<script type="text/javascript" src="d3/d3.min.js">
+    </script>
+		<script type="text/javascript" src="dddplot.js">
+		</script>
+		<style type="text/css" src="dddplot.css">
+		</style>
+	</head>
+	<body>
+    <script type="text/javascript">
+// Generate some random data points.
+function genData(n) {
+	var x = [];
+	for (var i = 0; i < n; ++i) {
+		x.push([
+			i,
+			5 * i + Math.random() * 30,
+			i / 10 + Math.random() * 10,
+			['A', 'B', 'C', 'D'][Math.floor(Math.random() * 4)]
+		])
+	}
+	return x;
+}
+
+var data = genData(30);
+var myAes = {
+	y: getField(1),
+	x: getField(0)
+};
+var myOptions = {
+	xlab: "my x label",
+	ylab: "my y label",
+	title: "some title"
+}
+dddplot(data, myAes, [geomCircle], myOptions);
+dddplot(data, myAes, [geomLine], myOptions);
+
+myAes.color = getField(2);
+dddplot(data, myAes, [geomCircle]);
+dddplot(data, myAes, [geomLine]);
+dddplot(data, myAes, [geomLine, geomCircle]);
+
+myAes.size = getField(2);
+dddplot(data, myAes, [geomCircle]);
+
+myAes.color = getField(3);
+dddplot(data, myAes, [geomCircle]);
+
+dddplot(data, myAes, [geomBar]);
+
+myAes.facet = getField(3);
+dddplot(data, myAes, [geomCircle])
+
+myAes.facet = undefined;
+myAes.x = getField(3);
+dddplot(data, myAes, [geomCircle]);
+
+var g = stochasticBlockModel(25, 5, 4, 1, 1, 4);
+var plot = plotDenseGraph(g, {
+	color: getField("block"),
+	size: getField("size"),
+	title: function(d) {
+		return "Value is " + d.size;
+	}
+});
+
+    </script>
+	</body>
+</html>
