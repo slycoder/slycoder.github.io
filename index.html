@@ -16,9 +16,18 @@
       background-color: #C5E47E;
     }
   </style>
+  <script>
+    function playAudio() {
+      var snd = new Audio("PIG3.mp3");
+      snd.play();
+      return false;
+    }
+  </script>
   <body>
     <div class="logo">
-      <img src="http://37.media.tumblr.com/c88c7a899d56c5be62b64cbf32380c0e/tumblr_mu68jipFQ81qi4ucgo1_500.jpg" />
+      <a href="javascript:playAudio()">
+        <img src="http://37.media.tumblr.com/c88c7a899d56c5be62b64cbf32380c0e/tumblr_mu68jipFQ81qi4ucgo1_500.jpg" />
+      </a>
     </div>
   </body>
 </html>
